@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EnvMonitor — Air Quality Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary:#1E293B; --on-primary:#FFFFFF;
+    --secondary:#334155; --on-secondary:#FFFFFF;
+    --accent:#22C55E; --on-accent:#0F172A;
+    --bg:#0F172A; --fg:#F8FAFC;
+    --card:#1B2336; --card-fg:#F8FAFC;
+    --muted:#272F42; --muted-fg:#94A3B8;
+    --border:#475569; --destructive:#EF4444;
+    --font-mono:'Fira Code',monospace; --font-sans:'Fira Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-sans);min-height:100vh}
+  .glass{background:rgba(27,35,54,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:14px}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(15,23,42,.85);backdrop-filter:blur(10px);z-index:10}
+  .title{font-family:var(--font-mono);font-size:20px;font-weight:600}
+  .subtitle{font-size:12px;color:var(--muted-fg);margin-top:2px}
+  .live{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--accent);font-family:var(--font-mono)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .wrap{max-width:1500px;margin:0 auto;padding:20px 28px}
+  .grid{display:grid;gap:16px}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .main-grid{grid-template-columns:2fr 1fr;gap:16px}
+  @media(max-width:1000px){.main-grid{grid-template-columns:1fr}}
+  .card{padding:18px}
+  .kpi{padding:16px;transition:transform .2s,box-shadow .2s;cursor:default}
+  .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .kpi-val{font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--accent);line-height:1}
+  .kpi-label{font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+  .kpi-meta{font-size:11px;margin-top:6px;color:var(--muted-fg)}
+  .kpi.ok .kpi-val{color:var(--accent)}
+  .kpi.warn .kpi-val{color:#F59E0B}
+  .kpi.crit .kpi-val{color:var(--destructive)}
+  .section-title{font-family:var(--font-mono);font-size:13px;color:var(--muted-fg);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .section-title::before{content:'';width:3px;height:14px;background:var(--accent);border-radius:2px}
+  .chart-wrap{position:relative;height:250px}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tab{padding:5px 12px;border-radius:7px;background:var(--muted);color:var(--muted-fg);font-size:11px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+  .tab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .alert{padding:10px 14px;border-radius:9px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#FCA5A5;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:8px;animation:slideIn .3s ease}
+  .alert.warn{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.35);color:#FCD34D}
+  @keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .sensor-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
+  .sensor-row:last-child{border-bottom:none}
+  .sensor-name{color:var(--fg)}.sensor-val{font-family:var(--font-mono);color:var(--accent);font-size:12px}
+  .proc-panel{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .proc-card{background:rgba(39,47,66,.6);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,.06)}
+  .proc-label{font-size:10px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .proc-val{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--fg)}
+  .proc-val.warn{color:#F59E0B}.proc-val.ok{color:var(--accent)}
+  .proc-list{max-height:140px;overflow-y:auto;font-size:11px;margin-top:6px}
+  .proc-item{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between}
+  .proc-item:last-child{border-bottom:none}
+  .proc-item .v{font-family:var(--font-mono);color:var(--accent)}
+  .footer{padding:14px 28px;font-size:11px;color:var(--muted-fg);border-top:1px solid var(--border);margin-top:16px;display:flex;justify-content:space-between}
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-family:var(--font-mono);background:var(--muted);color:var(--muted-fg)}
+  .badge.ok{background:rgba(34,197,94,.15);color:var(--accent)}
+  .badge.warn{background:rgba(245,158,11,.15);color:#F59E0B}
+  .badge.crit{background:rgba(239,68,68,.15);color:var(--destructive)}
+  .conn{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-fg)}
+  .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--muted-fg)}
+  .conn-dot.on{background:var(--accent)}
+  .zone-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:8px}
+  .zone-chip{background:var(--muted);border-radius:8px;padding:8px;text-align:center}
+  .zone-chip .zname{font-size:10px;color:var(--muted-fg);text-transform:uppercase}
+  .zone-chip .zval{font-family:var(--font-mono);font-size:15px;font-weight:600;margin-top:2px}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="title">EnvMonitor · Air Quality</div>
+    <div class="subtitle">Real-time monitoring + data processing pipeline · WorldSkills HR</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="conn"><span class="conn-dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">—</span></div>
+  </div>
+</div>
+<div class="wrap">
+  <div class="grid kpi-grid" id="kpiGrid"></div>
+
+  <div style="margin-top:16px" class="main-grid grid">
+    <div class="glass card">
+      <p class="section-title">PM2.5 trend · live (last 60 readings)</p>
+      <div class="tabs">
+        <span class="tab active" data-range="24h">24h</span>
+        <span class="tab" data-range="7d">7d</span>
+        <span class="tab" data-range="30d">30d</span>
+      </div>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="glass card">
+      <p class="section-title">Alerts <span class="badge" id="alertCount">0</span></p>
+      <div id="alertsList" style="max-height:160px;overflow-y:auto"></div>
+      <p class="section-title" style="margin-top:14px">Sensors</p>
+      <div id="sensorList" style="max-height:220px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px" class="glass card">
+    <p class="section-title">Data processing · obrada podataka (per sensor, last 1h)</p>
+    <div class="proc-panel">
+      <div class="proc-card">
+        <div class="proc-label">Sensor under analysis</div>
+        <select id="procSensor" style="width:100%;padding:6px 8px;border-radius:7px;background:var(--muted);color:var(--fg);border:1px solid var(--border);font-family:var(--font-mono);font-size:12px"></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <div><div class="proc-label">Trend</div><div class="proc-val" id="procTrend">—</div></div>
+          <div><div class="proc-label">Severity</div><div class="proc-val" id="procSev">—</div></div>
+          <div><div class="proc-label">Avg</div><div class="proc-val" id="procAvg">—</div></div>
+          <div><div class="proc-label">Min / Max</div><div class="proc-val" id="procMinMax">—</div></div>
+          <div><div class="proc-label">Anomalies</div><div class="proc-val" id="procAnom">—</div></div>
+          <div><div class="proc-label">Spikes</div><div class="proc-val" id="procSpike">—</div></div>
+        </div>
+      </div>
+      <div class="proc-card">
+        <div class="proc-label">Anomaly list (z-score)</div>
+        <div class="proc-list" id="anomList"></div>
+        <div class="proc-label" style="margin-top:10px">Spike list (median jump)</div>
+        <div class="proc-list" id="spikeList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px" class="glass card">
+    <p class="section-title">Zone comparison · avg PM2.5 / CO₂ by zone (last 1h)</p>
+    <div class="chart-wrap" style="height:200px"><canvas id="zoneChart"></canvas></div>
+    <div class="zone-grid" id="zoneGrid"></div>
+  </div>
+</div>
+<div class="footer">
+  <span>EnvMonitor v0.2 · SQLite · REST + WebSocket · processing pipeline</span>
+  <span id="procTime">processed: —</span>
+</div>
+
+<script>
+const API = '';
+let ws = null;
+let trendChart = null, zoneChart = null;
+let kpiData = [];
+let sensorMap = {};
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host);
+  ws.onopen = () => { document.getElementById('connDot').classList.add('on'); document.getElementById('connText').textContent = 'connected'; };
+  ws.onclose = () => { document.getElementById('connDot').classList.remove('on'); document.getElementById('connText').textContent = 'disconnected'; setTimeout(connectWS, 2000); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'reading') { updateKpi(msg.sensorId, msg.value, msg.at); }
+    if (msg.type === 'alert') { pushAlert(msg); }
+  };
+}
+
+async function loadKpi() {
+  const r = await fetch(API + '/api/kpi');
+  kpiData = await r.json();
+  renderKpi();
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+}
+
+function renderKpi() {
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = kpiData.map(k => {
+    const cls = k.severity === 'critical' ? 'crit' : k.severity === 'warn' ? 'warn' : 'ok';
+    const meta = k.above ? `⚠ above ${k.threshold}` : `threshold ${k.threshold}`;
+    return `<div class="glass kpi ${cls}">
+      <div class="kpi-val">${fmt(k.value)}<span style="font-size:12px;color:var(--muted-fg);margin-left:4px">${k.unit}</span></div>
+      <div class="kpi-label">${k.name} · ${k.zone}</div>
+      <div class="kpi-meta">${meta}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateKpi(sensorId, value, at) {
+  const k = kpiData.find(x => x.id === sensorId);
+  if (!k) return;
+  k.value = value; k.at = at;
+  k.above = k.threshold > 0 && value > k.threshold;
+  k.severity = k.above ? (value > k.threshold * 1.2 ? 'critical' : 'warn') : 'ok';
+  renderKpi();
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+}
+
+function fmt(v) { return (typeof v === 'number') ? v.toFixed(1) : v; }
+
+const alerts = [];
+function pushAlert(msg) {
+  alerts.unshift({ sensorId: msg.sensorId, value: msg.value, threshold: msg.threshold, at: Date.now() });
+  if (alerts.length > 20) alerts.pop();
+  renderAlerts();
+}
+async function loadAlerts() {
+  const r = await fetch(API + '/api/alerts');
+  const data = await r.json();
+  alerts.length = 0;
+  data.forEach(a => alerts.push({ sensorId: a.sensor_id, value: a.value, threshold: a.threshold, at: a.created_at, msg: a.message, sev: a.severity }));
+  renderAlerts();
+}
+function renderAlerts() {
+  const el = document.getElementById('alertsList');
+  document.getElementById('alertCount').textContent = alerts.length;
+  if (!alerts.length) { el.innerHTML = '<div style="color:var(--muted-fg);font-size:12px;padding:8px">No alerts</div>'; return; }
+  el.innerHTML = alerts.map(a => {
+    const cls = a.sev === 'critical' ? '' : 'warn';
+    const txt = a.msg || `${a.sensorId}: ${a.value} > ${a.threshold}`;
+    return `<div class="alert ${cls}"><span>⚠</span><span>${txt}</span><span style="margin-left:auto;font-size:10px;opacity:.7">${new Date(a.at).toLocaleTimeString()}</span></div>`;
+  }).join('');
+}
+
+async function loadSensors() {
+  const r = await fetch(API + '/api/sensors');
+  const data = await r.json();
+  sensorMap = {};
+  data.forEach(s => sensorMap[s.id] = s);
+  const sel = document.getElementById('procSensor');
+  sel.innerHTML = data.map(s => `<option value="${s.id}">${s.id} · ${s.name} (${s.type})</option>`).join('');
+  document.getElementById('sensorList').innerHTML = data.map(s =>
+    `<div class="sensor-row"><span class="sensor-name">${s.id} ${s.name}</span><span class="sensor-val">${s.type}</span></div>`
+  ).join('');
+}
+
+async function loadTrend(sensorId = 'S-01') {
+  const from = Date.now() - 3600000;
+  const to = Date.now();
+  const r = await fetch(API + `/api/readings/${sensorId}?from=${from}&to=${to}`);
+  const data = await r.json();
+  const labels = data.map(d => new Date(d.recorded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  const vals = data.map(d => d.value);
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: sensorId, data: vals, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,.1)', fill: true, tension: .3, pointRadius: 1.5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 }, maxTicksLimit: 8 } }, y: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } } } }
+  });
+}
+
+async function loadZones() {
+  const r = await fetch(API + '/api/process-all');
+  const data = await r.json();
+  const zones = {};
+  data.forEach(d => {
+    if (!zones[d.zone]) zones[d.zone] = { sum: 0, n: 0, type: d.type };
+    if (d.aggregate) { zones[d.zone].sum += d.aggregate.avg; zones[d.zone].n += 1; }
+  });
+  const labels = Object.keys(zones);
+  const vals = labels.map(z => zones[z].n ? +(zones[z].sum / zones[z].n).toFixed(1) : 0);
+  if (zoneChart) zoneChart.destroy();
+  zoneChart = new Chart(document.getElementById('zoneChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Avg', data: vals, backgroundColor: '#22C55E', borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#94A3B8', font: { size: 10 } } }, y: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } } } }
+  });
+  document.getElementById('zoneGrid').innerHTML = labels.map((z, i) =>
+    `<div class="zone-chip"><div class="zname">${z}</div><div class="zval">${vals[i]}</div></div>`
+  ).join('');
+}
+
+async function loadProcessing(sensorId) {
+  const r = await fetch(API + `/api/process/${sensorId}`);
+  const d = await r.json();
+  const trendEl = document.getElementById('procTrend');
+  trendEl.textContent = d.trend.toUpperCase();
+  trendEl.className = 'proc-val ' + (d.trend === 'up' ? 'warn' : 'ok');
+  const sevEl = document.getElementById('procSev');
+  sevEl.textContent = d.severity.toUpperCase();
+  sevEl.className = 'proc-val ' + (d.severity === 'ok' ? 'ok' : 'warn');
+  document.getElementById('procAvg').textContent = d.aggregate ? d.aggregate.avg + ' ' + d.unit : '—';
+  document.getElementById('procMinMax').textContent = d.aggregate ? `${d.aggregate.min} / ${d.aggregate.max}` : '—';
+  document.getElementById('procAnom').textContent = d.anomalies.length;
+  document.getElementById('procSpike').textContent = d.spikes.length;
+  document.getElementById('anomList').innerHTML = d.anomalies.length
+    ? d.anomalies.map(a => `<div class="proc-item"><span>${new Date(a.at).toLocaleTimeString()}</span><span class="v">${a.value} (z=${a.z})</span></div>`).join('')
+    : '<div style="color:var(--muted-fg);font-size:11px">none detected</div>';
+  document.getElementById('spikeList').innerHTML = d.spikes.length
+    ? d.spikes.map(s => `<div class="proc-item"><span>${new Date(s.at).toLocaleTimeString()}</span><span class="v">${s.value} (+${s.pct}%)</span></div>`).join('')
+    : '<div style="color:var(--muted-fg);font-size:11px">none detected</div>';
+  document.getElementById('procTime').textContent = 'processed: ' + new Date(d.processedAt).toLocaleTimeString();
+}
+
+async function init() {
+  await loadSensors();
+  await loadKpi();
+  await loadAlerts();
+  await loadTrend('S-01');
+  await loadZones();
+  await loadProcessing(document.getElementById('procSensor').value);
+  connectWS();
+  setInterval(() => loadProcessing(document.getElementById('procSensor').value), 5000);
+  setInterval(loadZones, 10000);
+  setInterval(loadKpi, 15000);
+  setInterval(loadAlerts, 8000);
+}
+
+document.getElementById('procSensor').addEventListener('change', (e) => loadProcessing(e.target.value));
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  loadTrend('S-01');
+}));
+
+init();
+</script>
+</body>
+</html>

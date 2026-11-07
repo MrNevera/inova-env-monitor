@@ -1,0 +1,8 @@
+node_modules
+envmonitor.db
+envmonitor.db-shm
+envmonitor.db-wal
+*.db
+.git
+.gitignore
+npm-debug.log

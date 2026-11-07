@@ -1,0 +1,197 @@
+openapi: 3.0.0
+info:
+  title: EnvMonitor API
+  version: 0.1.0
+  description: |
+    Real-time environmental monitoring dashboard — ingestion + processing pipeline (WorldSkills HR demo).
+
+    REST routes only. The WebSocket channel (live readings/alerts broadcast on ws://localhost:3000/)
+    is NOT covered by this OpenAPI document.
+
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /api/sensors:
+    get:
+      summary: List all sensors
+      operationId: listSensors
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sensor'
+
+  /api/kpi:
+    get:
+      summary: Current KPI snapshot per sensor
+      operationId: kpiSnapshot
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KpiEntry'
+
+  /api/readings:
+    post:
+      summary: Ingest a single reading
+      operationId: ingestReading
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadingInput'
+      responses:
+        '200':
+          description: Reading accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '400':
+          description: Bad request
+        '404':
+          description: Sensor not found
+
+  /api/readings/{sensorId}:
+    get:
+      summary: Readings for a sensor over a time window
+      operationId: getReadings
+      parameters:
+        - $ref: '#/components/path_parameters/SensorId'
+        - $ref: '#/components/query_parameters/From'
+        - $ref: '#/components/query_parameters/To'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reading'
+
+  /api/alerts:
+    get:
+      summary: Recent alerts
+      operationId: getAlerts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+
+  /api/process/{sensorId}:
+    get:
+      summary: Processed (anomaly/spike) analysis for one sensor
+      operationId: processSensor
+      parameters:
+        - $ref: '#/components/path_parameters/SensorId'
+        - $ref: '#/components/query_parameters/From'
+        - $ref: '#/components/query_parameters/To'
+      responses:
+        '200':
+          description: OK
+
+  /api/process-all:
+    get:
+      summary: Processed analysis for all sensors (last 1h)
+      operationId: processAllSensors
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+    Sensor:
+      type: object
+      required: [id, name, zone, type, unit]
+      properties:
+        id: { type: string, example: 's1' }
+        name: { type: string, example: 'Living Room PM2.5' }
+        zone: { type: string, example: 'living-room' }
+        type: { type: string, example: 'pm25' }
+        unit: { type: string, example: 'µg/m³' }
+        online: { type: boolean, example: true }
+        threshold: { type: number, example: 35 }
+
+    KpiEntry:
+      type: object
+      required: [id, name, zone, type, unit, value, at, threshold, above, severity]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        zone: { type: string }
+        type: { type: string }
+        unit: { type: string }
+        value: { type: number }
+        at: { type: integer, description: 'unix ms' }
+        threshold: { type: number }
+        above: { type: boolean }
+        severity: { type: string, enum: ['ok', 'warn'] }
+
+    ReadingInput:
+      type: object
+      required: [sensorId, value]
+      properties:
+        sensorId: { type: string, example: 's1' }
+        value: { type: number, example: 42.5 }
+        recordedAt: { type: integer, description: 'unix ms; defaults to now' }
+
+    Reading:
+      type: object
+      required: [sensorId, value, recordedAt]
+      properties:
+        sensorId: { type: string }
+        value: { type: number }
+        recordedAt: { type: integer, description: 'unix ms' }
+        id: { type: integer, description: 'row id (internal)' }
+
+    Alert:
+      type: object
+      required: [sensorId, type, severity, message, value, threshold, created_at]
+      properties:
+        sensorId: { type: string }
+        type: { type: string }
+        severity: { type: string, enum: ['warn', 'critical'] }
+        message: { type: string }
+        value: { type: number }
+        threshold: { type: number }
+        created_at: { type: integer, description: 'unix ms' }
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+  parameters:
+    SensorId:
+      in: path
+      name: sensorId
+      required: true
+      schema: { type: string }
+      description: Sensor id
+    From:
+      in: query
+      name: from
+      schema: { type: integer }
+      description: "Window start, unix ms (default: now - 24h)"
+    To:
+      in: query
+      name: to
+      schema: { type: integer }
+      description: "Window end, unix ms (default: now)"
