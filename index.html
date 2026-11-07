@@ -6,140 +6,372 @@
 <title>EnvMonitor — Air Quality Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-  :root {
-    --primary:#1E293B; --on-primary:#FFFFFF;
-    --secondary:#334155; --on-secondary:#FFFFFF;
-    --accent:#22C55E; --on-accent:#0F172A;
-    --bg:#0F172A; --fg:#F8FAFC;
-    --card:#1B2336; --card-fg:#F8FAFC;
-    --muted:#272F42; --muted-fg:#94A3B8;
-    --border:#475569; --destructive:#EF4444;
-    --font-mono:'Fira Code',monospace; --font-sans:'Fira Sans',sans-serif;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--fg);font-family:var(--font-sans);min-height:100vh}
-  .glass{background:rgba(27,35,54,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:14px}
-  .header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(15,23,42,.85);backdrop-filter:blur(10px);z-index:10}
-  .title{font-family:var(--font-mono);font-size:20px;font-weight:600}
-  .subtitle{font-size:12px;color:var(--muted-fg);margin-top:2px}
-  .live{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--accent);font-family:var(--font-mono)}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 1.4s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  .wrap{max-width:1500px;margin:0 auto;padding:20px 28px}
-  .grid{display:grid;gap:16px}
-  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-  .main-grid{grid-template-columns:2fr 1fr;gap:16px}
-  @media(max-width:1000px){.main-grid{grid-template-columns:1fr}}
-  .card{padding:18px}
-  .kpi{padding:16px;transition:transform .2s,box-shadow .2s;cursor:default}
-  .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
-  .kpi-val{font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--accent);line-height:1}
-  .kpi-label{font-size:11px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
-  .kpi-meta{font-size:11px;margin-top:6px;color:var(--muted-fg)}
-  .kpi.ok .kpi-val{color:var(--accent)}
-  .kpi.warn .kpi-val{color:#F59E0B}
-  .kpi.crit .kpi-val{color:var(--destructive)}
-  .section-title{font-family:var(--font-mono);font-size:13px;color:var(--muted-fg);margin:0 0 12px;display:flex;align-items:center;gap:8px}
-  .section-title::before{content:'';width:3px;height:14px;background:var(--accent);border-radius:2px}
-  .chart-wrap{position:relative;height:250px}
-  .tabs{display:flex;gap:6px;margin-bottom:12px}
-  .tab{padding:5px 12px;border-radius:7px;background:var(--muted);color:var(--muted-fg);font-size:11px;cursor:pointer;border:1px solid transparent;transition:all .15s}
-  .tab.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
-  .alert{padding:10px 14px;border-radius:9px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#FCA5A5;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:8px;animation:slideIn .3s ease}
-  .alert.warn{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.35);color:#FCD34D}
-  @keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-  .sensor-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
-  .sensor-row:last-child{border-bottom:none}
-  .sensor-name{color:var(--fg)}.sensor-val{font-family:var(--font-mono);color:var(--accent);font-size:12px}
-  .proc-panel{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
-  .proc-card{background:rgba(39,47,66,.6);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,.06)}
-  .proc-label{font-size:10px;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-  .proc-val{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--fg)}
-  .proc-val.warn{color:#F59E0B}.proc-val.ok{color:var(--accent)}
-  .proc-list{max-height:140px;overflow-y:auto;font-size:11px;margin-top:6px}
-  .proc-item{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between}
-  .proc-item:last-child{border-bottom:none}
-  .proc-item .v{font-family:var(--font-mono);color:var(--accent)}
-  .footer{padding:14px 28px;font-size:11px;color:var(--muted-fg);border-top:1px solid var(--border);margin-top:16px;display:flex;justify-content:space-between}
-  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-family:var(--font-mono);background:var(--muted);color:var(--muted-fg)}
-  .badge.ok{background:rgba(34,197,94,.15);color:var(--accent)}
-  .badge.warn{background:rgba(245,158,11,.15);color:#F59E0B}
-  .badge.crit{background:rgba(239,68,68,.15);color:var(--destructive)}
-  .conn{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-fg)}
-  .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--muted-fg)}
-  .conn-dot.on{background:var(--accent)}
-  .zone-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:8px}
-  .zone-chip{background:var(--muted);border-radius:8px;padding:8px;text-align:center}
-  .zone-chip .zname{font-size:10px;color:var(--muted-fg);text-transform:uppercase}
-  .zone-chip .zval{font-family:var(--font-mono);font-size:15px;font-weight:600;margin-top:2px}
-  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+:root{
+  --bg:#0F172A;
+  --surface:#111827;
+  --card:#1B2336;
+  --border:#334155;
+  --border-hover:#475569;
+  --fg:#F8FAFC;
+  --muted:#94A3B8;
+  --muted-dim:#64748B;
+  --primary:#1E293B;
+  --on-primary:#FFFFFF;
+  --accent:#22C55E;
+  --on-accent:#0F172A;
+  --accent-glow:rgba(34,197,94,.25);
+  --warn:#F59E0B;
+  --crit:#EF4444;
+  --warn-glow:rgba(245,158,11,.15);
+  --crit-glow:rgba(239,68,68,.15);
+  --font-sans:'Inter',system-ui,sans-serif;
+  --font-mono:'Fira Code',ui-monospace,monospace;
+  --radius:12px;
+  --shadow:0 20px 25px -5px rgba(0,0,0,.3),0 8px 10px -7px rgba(0,0,0,.2);
+  --transition:all .25s cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-sans);
+  font-size:14px;
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+button{cursor:pointer;font:inherit}
+
+/* Layout */
+.wrap{max-width:1440px;margin:0 auto;padding:24px}
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 24px;
+  border-bottom:1px solid var(--border);
+  background:rgba(17,24,39,.7);
+  backdrop-filter:blur(12px);
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+.header-left{display:flex;align-items:center;gap:16px}
+.brand{font-family:var(--font-mono);font-size:17px;font-weight:700;letter-spacing:-0.02em}
+.tag{font-size:11.5px;color:var(--muted-dim);margin-top:2px}
+.header-right{display:flex;align-items:center;gap:14px}
+
+/* Status chips */
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:rgba(30,41,59,.4);
+  color:var(--muted);
+  font-size:11px;
+  font-family:var(--font-mono);
+  font-weight:500;
+  transition:var(--transition);
+}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+.dot{
+  width:8px;height:8px;border-radius:50%;background:var(--muted-dim);
+  box-shadow:0 0 0 2px rgba(148,163,184,.2);
+}
+.dot.on{background:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+.live{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-weight:600}
+
+/* Grid */
+.grid{display:grid;gap:20px}
+.kpi-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.main-grid{grid-template-columns:1fr 320px;gap:20px}
+@media (max-width:1100px){.main-grid{grid-template-columns:1fr}}
+
+/* Cards */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  transition:var(--transition);
+}
+.card:hover{border-color:var(--border-hover)}
+.card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 18px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--muted-dim);
+  border-top-left-radius:11px;
+  border-top-right-radius:11px;
+}
+.card-body{padding:18px}
+.accent-bar{width:3px;height:100%;background:linear-gradient(180deg,var(--accent),#166534);border-radius:2px;margin-left:8px}
+
+/* KPI tiles */
+.kpi{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px 14px;
+  position:relative;
+  overflow:hidden;
+  transition:var(--transition);
+}
+.kpi::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:var(--transition)}
+.kpi.warn::before{background:var(--warn)}
+.kpi.crit::before{background:var(--crit)}
+.kpi:hover{transform:translateY(-2px);border-color:var(--border-hover);box-shadow:0 12px 24px rgba(0,0,0,.35)}
+.kpi:hover::before{transform:scaleX(1)}
+.kpi-top{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:8px}
+.kpi-val{
+  font-family:var(--font-mono);
+  font-size:30px;
+  font-weight:700;
+  line-height:1.1;
+  color:var(--fg);
+  letter-spacing:-0.02em;
+}
+.kpi-val .unit{font-size:14px;color:var(--muted-dim);font-weight:500;opacity:.9}
+.kpi-label{font-size:11px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.kpi-meta{font-size:10px;color:var(--muted-dim);margin-top:2px}
+
+/* Tabs */
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{
+  padding:7px 14px;
+  border-radius:8px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--muted);
+  font-size:11px;
+  font-family:var(--font-mono);
+  cursor:pointer;
+  transition:var(--transition);
+  white-space:nowrap;
+}
+.tab.active{
+  background:var(--accent);
+  color:var(--on-accent);
+  border-color:var(--accent);
+  box-shadow:0 0 14px var(--accent-glow);
+}
+
+/* Charts */
+.chart-wrap{position:relative;height:230px;width:100%}
+.chart-title{font-family:var(--font-mono);font-size:10px;color:var(--muted-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+
+/* Alerts */
+.alert{padding:10px 12px;border-radius:10px;border:1px solid rgba(239,68,68,.35);background:var(--crit-glow);color:#FCA5A5;font-size:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;animation:slideIn .3s ease}
+.alert.warn{border-color:rgba(245,158,11,.35);background:var(--warn-glow);color:#FCD34D}
+.alert.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.15);color:#86EFAC}
+.alert .time{margin-left:auto;font-size:10px;opacity:.7;color:inherit}
+.alert-empty{color:var(--muted-dim);font-size:12px;padding:8px}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Sensor list */
+.sensor-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:9px 10px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:12px;
+  transition:var(--transition);
+}
+.sensor-row:hover{background:rgba(255,255,255,.03)}
+.sensor-row:last-child{border-bottom:none}
+.sensor-name{color:var(--fg)}
+.sensor-id{font-family:var(--font-mono);font-size:11px;color:var(--muted-dim);margin-right:6px}
+.sensor-val{font-family:var(--font-mono);color:var(--accent);font-weight:600;font-size:12px}
+
+/* Processing panel */
+.proc-panel{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+@media (max-width:640px){.proc-panel{grid-template-columns:1fr}}
+.proc-card{
+  background:rgba(30,41,59,.5);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px;
+}
+.proc-label{font-family:var(--font-mono);font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.proc-val{
+  font-family:var(--font-mono);
+  font-size:17px;
+  font-weight:600;
+  color:var(--fg);
+  margin-bottom:2px;
+}
+.proc-val.ok{color:var(--accent)}
+.proc-val.warn{color:var(--warn)}
+.proc-val.crit{color:var(--crit)}
+.proc-list{max-height:150px;overflow-y:auto;font-size:11px;margin-top:8px}
+.proc-item{
+  display:flex;
+  justify-content:space-between;
+  padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.03);
+}
+.proc-item:last-child{border-bottom:none}
+.proc-item .v{font-family:var(--font-mono);color:var(--accent)}
+
+/* Zone chips */
+.zone-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:10px}
+.zone-chip{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px;
+  text-align:center;
+  transition:var(--transition);
+}
+.zone-chip:hover{border-color:var(--border-hover);transform:translateY(-1px)}
+.zname{font-family:var(--font-mono);font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.zval{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--fg);display:block}
+
+/* Select */
+select{
+  width:100%;
+  padding:8px 10px;
+  border-radius:8px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  color:var(--fg);
+  font-family:var(--font-mono);
+  font-size:12px;
+  margin-top:6px;
+}
+select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* Footer */
+.footer{
+  padding:18px 24px;
+  font-size:11px;
+  color:var(--muted-dim);
+  border-top:1px solid var(--border);
+  margin-top:24px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
+
+/* Utility */
+.empty-state{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:120px;
+  color:var(--muted-dim);
+  font-size:12px;
+  border-radius:10px;
+  border:1px dashed var(--border);
+  background:rgba(255,255,255,.02);
+}
 </style>
 </head>
 <body>
-<div class="header">
-  <div>
-    <div class="title">EnvMonitor · Air Quality</div>
-    <div class="subtitle">Real-time monitoring + data processing pipeline · WorldSkills HR</div>
-  </div>
-  <div style="display:flex;align-items:center;gap:16px">
-    <div class="conn"><span class="conn-dot" id="connDot"></span><span id="connText">connecting…</span></div>
-    <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">—</span></div>
-  </div>
-</div>
 <div class="wrap">
+  <div class="header">
+    <div class="header-left">
+      <div>
+        <div class="brand">EnvMonitor<span class="accent-bar"></span></div>
+        <div class="tag">Real-time monitoring + data processing pipeline · WorldSkills HR</div>
+      </div>
+      <div class="chip"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    </div>
+    <div class="header-right">
+      <div class="chip live"><span class="dot on"></span>LIVE · <span id="lastUpdate">—</span></div>
+    </div>
+  </div>
+
   <div class="grid kpi-grid" id="kpiGrid"></div>
 
-  <div style="margin-top:16px" class="main-grid grid">
-    <div class="glass card">
-      <p class="section-title">PM2.5 trend · live (last 60 readings)</p>
-      <div class="tabs">
-        <span class="tab active" data-range="24h">24h</span>
-        <span class="tab" data-range="7d">7d</span>
-        <span class="tab" data-range="30d">30d</span>
-      </div>
-      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-    </div>
-    <div class="glass card">
-      <p class="section-title">Alerts <span class="badge" id="alertCount">0</span></p>
-      <div id="alertsList" style="max-height:160px;overflow-y:auto"></div>
-      <p class="section-title" style="margin-top:14px">Sensors</p>
-      <div id="sensorList" style="max-height:220px;overflow-y:auto"></div>
-    </div>
-  </div>
-
-  <div style="margin-top:16px" class="glass card">
-    <p class="section-title">Data processing · obrada podataka (per sensor, last 1h)</p>
-    <div class="proc-panel">
-      <div class="proc-card">
-        <div class="proc-label">Sensor under analysis</div>
-        <select id="procSensor" style="width:100%;padding:6px 8px;border-radius:7px;background:var(--muted);color:var(--fg);border:1px solid var(--border);font-family:var(--font-mono);font-size:12px"></select>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-          <div><div class="proc-label">Trend</div><div class="proc-val" id="procTrend">—</div></div>
-          <div><div class="proc-label">Severity</div><div class="proc-val" id="procSev">—</div></div>
-          <div><div class="proc-label">Avg</div><div class="proc-val" id="procAvg">—</div></div>
-          <div><div class="proc-label">Min / Max</div><div class="proc-val" id="procMinMax">—</div></div>
-          <div><div class="proc-label">Anomalies</div><div class="proc-val" id="procAnom">—</div></div>
-          <div><div class="proc-label">Spikes</div><div class="proc-val" id="procSpike">—</div></div>
+  <div class="grid main-grid" style="margin-top:16px">
+    <div class="card">
+      <div class="card-head">
+        PM2.5 trend · live (last 60 readings)
+        <div class="tabs">
+          <span class="tab active" data-range="24h">24h</span>
+          <span class="tab" data-range="7d">7d</span>
+          <span class="tab" data-range="30d">30d</span>
         </div>
       </div>
-      <div class="proc-card">
-        <div class="proc-label">Anomaly list (z-score)</div>
-        <div class="proc-list" id="anomList"></div>
-        <div class="proc-label" style="margin-top:10px">Spike list (median jump)</div>
-        <div class="proc-list" id="spikeList"></div>
+      <div class="card-body">
+        <div class="chart-title">Sensor S-01 · PM2.5 (µg/m³)</div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="card-head">
+        Alerts
+        <span class="chip" style="font-size:10px;padding:3px 8px" id="alertCount">0</span>
+      </div>
+      <div class="card-body" style="flex:1;overflow:auto">
+        <div id="alertsList"></div>
+      </div>
+      <div class="card-head" style="padding:10px 18px">
+        Sensors <span class="chip" style="font-size:10px;padding:3px 8px" id="sensorCount">—</span>
+      </div>
+      <div class="card-body" id="sensorList" style="flex:1;overflow:auto"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-head">Data processing · obrada podataka (per sensor, last 1h)</div>
+    <div class="card-body">
+      <div class="proc-panel">
+        <div class="proc-card">
+          <div class="proc-label">Sensor under analysis</div>
+          <select id="procSensor"></select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+            <div><div class="proc-label">Trend</div><div class="proc-val" id="procTrend">—</div></div>
+            <div><div class="proc-label">Severity</div><div class="proc-val" id="procSev">—</div></div>
+            <div><div class="proc-label">Avg</div><div class="proc-val" id="procAvg">—</div></div>
+            <div><div class="proc-label">Min / Max</div><div class="proc-val" id="procMinMax">—</div></div>
+            <div><div class="proc-label">Anomalies</div><div class="proc-val" id="procAnom">—</div></div>
+            <div><div class="proc-label">Spikes</div><div class="proc-val" id="procSpike">—</div></div>
+          </div>
+        </div>
+        <div class="proc-card">
+          <div class="proc-label">Anomaly list (z-score)</div>
+          <div class="proc-list" id="anomList"></div>
+          <div class="proc-label" style="margin-top:10px">Spike list (median jump)</div>
+          <div class="proc-list" id="spikeList"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div style="margin-top:16px" class="glass card">
-    <p class="section-title">Zone comparison · avg PM2.5 / CO₂ by zone (last 1h)</p>
-    <div class="chart-wrap" style="height:200px"><canvas id="zoneChart"></canvas></div>
-    <div class="zone-grid" id="zoneGrid"></div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-head">Zone comparison · avg PM2.5 / CO₂ by zone (last 1h)</div>
+    <div class="card-body" style="padding-top:12px">
+      <div class="chart-wrap" style="height:180px"><canvas id="zoneChart"></canvas></div>
+      <div class="zone-grid" id="zoneGrid"></div>
+    </div>
   </div>
 </div>
+
 <div class="footer">
   <span>EnvMonitor v0.2 · SQLite · REST + WebSocket · processing pipeline</span>
   <span id="procTime">processed: —</span>
@@ -176,12 +408,18 @@ function renderKpi() {
   grid.innerHTML = kpiData.map(k => {
     const cls = k.severity === 'critical' ? 'crit' : k.severity === 'warn' ? 'warn' : 'ok';
     const meta = k.above ? `⚠ above ${k.threshold}` : `threshold ${k.threshold}`;
-    return `<div class="glass kpi ${cls}">
-      <div class="kpi-val">${fmt(k.value)}<span style="font-size:12px;color:var(--muted-fg);margin-left:4px">${k.unit}</span></div>
-      <div class="kpi-label">${k.name} · ${k.zone}</div>
-      <div class="kpi-meta">${meta}</div>
+    return `<div class="kpi ${cls}">
+      <div class="kpi-top">
+        <div>
+          <div class="kpi-val">${fmt(k.value)}<span class="unit">${k.unit}</span></div>
+          <div class="kpi-label">${k.name}</div>
+          <div class="kpi-meta">${k.zone}</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted-dim)">${meta}</div>
+      </div>
     </div>`;
   }).join('');
+  document.getElementById('sensorCount').textContent = kpiData.length;
 }
 
 function updateKpi(sensorId, value, at) {
@@ -198,7 +436,7 @@ function fmt(v) { return (typeof v === 'number') ? v.toFixed(1) : v; }
 
 const alerts = [];
 function pushAlert(msg) {
-  alerts.unshift({ sensorId: msg.sensorId, value: msg.value, threshold: msg.threshold, at: Date.now() });
+  alerts.unshift({ sensorId: msg.sensorId, value: msg.value, threshold: msg.threshold, at: Date.now(), msg: msg.message, sev: msg.severity });
   if (alerts.length > 20) alerts.pop();
   renderAlerts();
 }
@@ -212,11 +450,11 @@ async function loadAlerts() {
 function renderAlerts() {
   const el = document.getElementById('alertsList');
   document.getElementById('alertCount').textContent = alerts.length;
-  if (!alerts.length) { el.innerHTML = '<div style="color:var(--muted-fg);font-size:12px;padding:8px">No alerts</div>'; return; }
+  if (!alerts.length) { el.innerHTML = '<div class="alert-empty">No alerts</div>'; return; }
   el.innerHTML = alerts.map(a => {
-    const cls = a.sev === 'critical' ? '' : 'warn';
+    const cls = a.sev === 'critical' ? 'crit' : a.sev === 'warn' ? 'warn' : 'ok';
     const txt = a.msg || `${a.sensorId}: ${a.value} > ${a.threshold}`;
-    return `<div class="alert ${cls}"><span>⚠</span><span>${txt}</span><span style="margin-left:auto;font-size:10px;opacity:.7">${new Date(a.at).toLocaleTimeString()}</span></div>`;
+    return `<div class="alert ${cls}"><span>${txt}</span><span class="time">${new Date(a.at).toLocaleTimeString()}</span></div>`;
   }).join('');
 }
 
@@ -228,7 +466,7 @@ async function loadSensors() {
   const sel = document.getElementById('procSensor');
   sel.innerHTML = data.map(s => `<option value="${s.id}">${s.id} · ${s.name} (${s.type})</option>`).join('');
   document.getElementById('sensorList').innerHTML = data.map(s =>
-    `<div class="sensor-row"><span class="sensor-name">${s.id} ${s.name}</span><span class="sensor-val">${s.type}</span></div>`
+    `<div class="sensor-row"><span><span class="sensor-id">${s.id}</span><span class="sensor-name">${s.name}</span></span><span class="sensor-val">${s.type}</span></div>`
   ).join('');
 }
 
@@ -242,9 +480,9 @@ async function loadTrend(sensorId = 'S-01') {
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById('trendChart'), {
     type: 'line',
-    data: { labels, datasets: [{ label: sensorId, data: vals, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,.1)', fill: true, tension: .3, pointRadius: 1.5 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 }, maxTicksLimit: 8 } }, y: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } } } }
+    data: { labels, datasets: [{ label: sensorId, data: vals, borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,.12)', fill: true, tension: .35, pointRadius: 0, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#94A3B8', font: { size: 9 }, maxTicksLimit: 8 }, grid: { display: false } }, y: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } } } }
   });
 }
 
@@ -261,12 +499,12 @@ async function loadZones() {
   if (zoneChart) zoneChart.destroy();
   zoneChart = new Chart(document.getElementById('zoneChart'), {
     type: 'bar',
-    data: { labels, datasets: [{ label: 'Avg', data: vals, backgroundColor: '#22C55E', borderRadius: 6 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: '#94A3B8', font: { size: 10 } } }, y: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } } } }
+    data: { labels, datasets: [{ label: 'Avg', data: vals, backgroundColor: '#22C55E', borderRadius: 6, barThickness: 24 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#94A3B8', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } } } }
   });
   document.getElementById('zoneGrid').innerHTML = labels.map((z, i) =>
-    `<div class="zone-chip"><div class="zname">${z}</div><div class="zval">${vals[i]}</div></div>`
+    `<div class="zone-chip"><span class="zname">${z}</span><span class="zval">${vals[i]}</span></div>`
   ).join('');
 }
 
@@ -285,10 +523,10 @@ async function loadProcessing(sensorId) {
   document.getElementById('procSpike').textContent = d.spikes.length;
   document.getElementById('anomList').innerHTML = d.anomalies.length
     ? d.anomalies.map(a => `<div class="proc-item"><span>${new Date(a.at).toLocaleTimeString()}</span><span class="v">${a.value} (z=${a.z})</span></div>`).join('')
-    : '<div style="color:var(--muted-fg);font-size:11px">none detected</div>';
+    : '<div style="color:var(--muted-dim);font-size:11px">none detected</div>';
   document.getElementById('spikeList').innerHTML = d.spikes.length
     ? d.spikes.map(s => `<div class="proc-item"><span>${new Date(s.at).toLocaleTimeString()}</span><span class="v">${s.value} (+${s.pct}%)</span></div>`).join('')
-    : '<div style="color:var(--muted-fg);font-size:11px">none detected</div>';
+    : '<div style="color:var(--muted-dim);font-size:11px">none detected</div>';
   document.getElementById('procTime').textContent = 'processed: ' + new Date(d.processedAt).toLocaleTimeString();
 }
 
